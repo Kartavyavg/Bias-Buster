@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The BiasBuster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto mt-10 p-5 bg-white rounded-lg shadow-md">
+        <h1 class="text-3xl font-bold text-center text-blue-500">The BiasBuster</h1>
+        <p class="text-center font-bold text-gray-600 mt-2">Enter news text or provide a URL to analyze its bias.</p>
+        
+        <div class="flex flex-col md:flex-row mt-5 gap-5">
+            <!-- Left Section -->
+            <div class="flex-1">
+                <textarea id="newsInput" 
+                    class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" 
+                    rows="6" placeholder="Paste your news content here..."></textarea>
+                
+                <input 
+                    id="newsURL" 
+                    class="w-full mt-5 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" 
+                    type="url" 
+                    placeholder="Or enter a URL to fetch and analyze content..." />
+
+                <div class="mt-5">
+                    <label for="positiveWords" class="block text-gray-700 font-medium">Positive Words (comma-separated):</label>
+                    <input id="positiveWords" 
+                        class="w-full mt-2 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400" 
+                        type="text" 
+                        placeholder="e.g., excellent, good, success, happy">
+                </div>
+
+                <div class="mt-5">
+                    <label for="negativeWords" class="block text-gray-700 font-medium">Negative Words (comma-separated):</label>
+                    <input id="negativeWords" 
+                        class="w-full mt-2 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400" 
+                        type="text" 
+                        placeholder="e.g., bad, poor, failure, sad">
+                </div>
+
+                <button 
+                    id="analyzeButton"
+                    class="w-full mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-700 transition duration-200">
+                    Analyze Bias
+                </button>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="mt-5 text-center hidden">
+                    <p class="text-gray-600 font-medium">Analyzing... Please wait.</p>
+                    <div class="loader mt-2 mx-auto w-8 h-8 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
+                </div>
+
+                <!-- Result Area -->
+                <div id="result" class="mt-5 p-4 bg-gray-50 border rounded-lg hidden">
+                    <p class="text-gray-700"><strong>Analysis Result:</strong> <span id="analysisText"></span></p>
+                    <p class="text-gray-700 mt-2"><strong>Total Words:</strong> <span id="totalWords"></span></p>
+                    <p class="text-green-600 hover:cursor-pointer relative">
+                        <strong>Positive Words:</strong> 
+                        <span id="positiveCount"></span>
+                        <div id="positiveDropdown" class="absolute left-0 mt-2 p-2 bg-white border rounded-lg shadow-lg hidden">
+                            <p class="text-green-600">Positive Words List</p>
+                        </div>
+                    </p>
+                    <p class="text-red-600 hover:cursor-pointer relative">
+                        <strong>Negative Words:</strong> 
+                        <span id="negativeCount"></span>
+                        <div id="negativeDropdown" class="absolute left-0 mt-2 p-2 bg-white border rounded-lg shadow-lg hidden">
+                            <p class="text-red-600">Negative Words List</p>
+                        </div>
+                    </p>
+                    <p class="text-gray-500"><strong>Neutral Words:</strong> <span id="neutralCount"></span></p>
+                </div>
+            </div>
+
+            <!-- Right Section -->
+            <div class="flex-1">
+                <div class="p-4 bg-gray-50 border rounded-lg">
+                    <h2 class="text-lg font-semibold text-gray-700">Bias Analysis Graph</h2>
+                    <canvas id="biasChart" class="mt-5"></canvas>
+                </div>
+            </div>
+        </div>
+        <h1 class="font-bold text-center text-xl underline text-teal-900 m-3 border border-teal-400 animate-pulse p-2 rounded-sm">
+            Developed by Kartavya Vg
+        </h1>
+    </div>
+
+    <script>
+        document.getElementById("analyzeButton").addEventListener("click", analyzeBias);
+
+        async function analyzeBias() {
+            const input = document.getElementById("newsInput").value.trim();
+            const url = document.getElementById("newsURL").value.trim();
+            const positiveWordsInput = document.getElementById("positiveWords").value.trim();
+            const negativeWordsInput = document.getElementById("negativeWords").value.trim();
+            const resultDiv = document.getElementById("result");
+            const loadingDiv = document.getElementById("loading");
+            const analysisText = document.getElementById("analysisText");
+            const chartCanvas = document.getElementById("biasChart").getContext('2d');
+            const totalWordsEl = document.getElementById("totalWords");
+            const positiveCountEl = document.getElementById("positiveCount");
+            const negativeCountEl = document.getElementById("negativeCount");
+            const neutralCountEl = document.getElementById("neutralCount");
+            const positiveDropdown = document.getElementById("positiveDropdown");
+            const negativeDropdown = document.getElementById("negativeDropdown");
+
+            // Show loading indicator and hide results
+            loadingDiv.classList.remove("hidden");
+            resultDiv.classList.add("hidden");
+
+            let textToAnalyze = input;
+
+            if (url && !input) {
+                try {
+                    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+                    const data = await response.json();
+                    const parser = new DOMParser();
+                    const htmlDoc = parser.parseFromString(data.contents, "text/html");
+                    const paragraphs = Array.from(htmlDoc.querySelectorAll("article p, p"));
+                    textToAnalyze = paragraphs.map(p => p.innerText).join(" ");
+                } catch (error) {
+                    analysisText.textContent = "Failed to fetch or process URL content.";
+                    loadingDiv.classList.add("hidden");
+                    resultDiv.classList.remove("hidden");
+                    return;
+                }
+            }
+
+            if (!textToAnalyze) {
+                analysisText.textContent = "Please provide text or a valid URL.";
+                loadingDiv.classList.add("hidden");
+                resultDiv.classList.remove("hidden");
+                return;
+            }
+
+            const positiveWords = positiveWordsInput.split(",").map(w => w.trim().toLowerCase());
+            const negativeWords = negativeWordsInput.split(",").map(w => w.trim().toLowerCase());
+            const words = textToAnalyze.toLowerCase().split(/\s+/);
+
+            let positiveCount = 0, negativeCount = 0, matchedPositive = [], matchedNegative = [];
+            words.forEach(word => {
+                if (positiveWords.includes(word)) {
+                    positiveCount++;
+                    matchedPositive.push(word);
+                }
+                if (negativeWords.includes(word)) {
+                    negativeCount++;
+                    matchedNegative.push(word);
+                }
+            });
+
+            const neutralCount = words.length - positiveCount - negativeCount;
+
+            // Update results
+            analysisText.textContent = `The content appears to be ${
+                positiveCount > negativeCount
+                    ? "positively biased"
+                    : negativeCount > positiveCount
+                    ? "negatively biased"
+                    : "neutral"
+            }.`;
+            totalWordsEl.textContent = words.length;
+            positiveCountEl.textContent = positiveCount;
+            negativeCountEl.textContent = negativeCount;
+            neutralCountEl.textContent = neutralCount;
+
+            positiveDropdown.textContent = matchedPositive.join(", ");
+            negativeDropdown.textContent = matchedNegative.join(", ");
+            positiveCountEl.addEventListener("mouseover", () => positiveDropdown.classList.remove("hidden"));
+            positiveCountEl.addEventListener("mouseout", () => positiveDropdown.classList.add("hidden"));
+            negativeCountEl.addEventListener("mouseover", () => negativeDropdown.classList.remove("hidden"));
+            negativeCountEl.addEventListener("mouseout", () => negativeDropdown.classList.add("hidden"));
+
+            // Render chart
+            new Chart(chartCanvas, {
+                type: "doughnut",
+                data: {
+                    labels: ["Positive Words", "Negative Words", "Neutral Words"],
+                    datasets: [{ data: [positiveCount, negativeCount, neutralCount], backgroundColor: ["#4caf50", "#f44336", "#9e9e9e"] }]
+                },
+                options: { responsive: true }
+            });
+
+            // Hide loading indicator and show results
+            loadingDiv.classList.add("hidden");
+            resultDiv.classList.remove("hidden");
+        }
+    </script>
+</body>
+</html>
