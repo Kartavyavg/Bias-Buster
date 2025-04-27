@@ -1,4 +1,4 @@
-##### 📰 BiasBuster
+## 📰 BiasBuster
 
 **BiasBuster** is a smart tool designed to detect bias in news articles, helping readers get a clearer, fairer view of what's really happening.
 Mail to view Project Report  
